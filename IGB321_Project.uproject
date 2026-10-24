@@ -28,5 +28,12 @@
     }
   ],
   "EngineAssociation": "5.8",
-  "Category": ""
+  "Category": "",
+    "Modules": [
+        {
+            "Name": "IGB321_Project",
+            "Type": "Runtime",
+            "LoadingPhase": "Default"
+        }
+    ]
 }
