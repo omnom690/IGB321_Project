@@ -1,0 +1,32 @@
+{
+  "FileVersion": 3,
+  "Description": "Three plain blockout levels with the essential Stack O Bot character controls.",
+  "Plugins": [
+    {
+      "Name": "ControlRig",
+      "Enabled": true
+    },
+    {
+      "Name": "FullBodyIK",
+      "Enabled": true
+    },
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    },
+    {
+      "Name": "Metasound",
+      "Enabled": true
+    },
+    {
+      "Name": "AudioModulation",
+      "Enabled": true
+    },
+    {
+      "Name": "Niagara",
+      "Enabled": true
+    }
+  ],
+  "EngineAssociation": "5.8",
+  "Category": ""
+}
