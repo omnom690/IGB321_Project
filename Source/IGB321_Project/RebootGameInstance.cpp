@@ -1,8 +1,30 @@
 #include "RebootGameInstance.h"
+#include "RebootBotVisualComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/PackageName.h"
 #include "UObject/UnrealType.h"
+
+namespace
+{
+void InstallPlayerVisual(UWorld* World)
+{
+    ACharacter* Character=UGameplayStatics::GetPlayerCharacter(World,0);
+    if (!IsValid(Character) || !Character->GetClass()->GetPathName().Contains(TEXT("/Game/StackOBot/Blueprints/Character/BP_Bot."))
+        || Character->FindComponentByClass<URebootBotVisualComponent>()) return;
+    const URebootBotVisualComponent* Settings=GetDefault<URebootBotVisualComponent>();
+    if (Settings->RobotMesh.IsNull() || !FPackageName::DoesPackageExist(Settings->RobotMesh.ToSoftObjectPath().GetLongPackageName())) return;
+    USkeletalMesh* Mesh=Settings->RobotMesh.LoadSynchronous();
+    if (!IsValid(Mesh)) return;
+    URebootBotVisualComponent* Visual=NewObject<URebootBotVisualComponent>(Character,TEXT("REBOOT_Robot2_Visual"));
+    Visual->SetupAttachment(Character->GetRootComponent());Character->AddInstanceComponent(Visual);
+    Visual->RegisterComponent();
+    if (!Visual->InitializeForCharacter(Character,Mesh)) Visual->DestroyComponent();
+}
+}
 
 void URebootGameInstance::Init()
 {
@@ -36,8 +58,10 @@ void URebootGameInstance::ResetProgress() { CompletedSystemMask=0; }
 
 void URebootGameInstance::ObserveLevelProgress(UWorld* World,ELevelTick TickType,float DeltaSeconds)
 {
-    if (IsSystemComplete(0) || !IsValid(World) || !World->IsGameWorld() || World->GetGameInstance()!=this
-        || UGameplayStatics::GetCurrentLevelName(World,true)!=TEXT("Level_01_ReceivingSorting")) return;
+    if (!IsValid(World) || !World->IsGameWorld() || World->GetGameInstance()!=this) return;
+    InstallPlayerVisual(World);
+    const FString LevelName=UGameplayStatics::GetCurrentLevelName(World,true);
+    if (IsSystemComplete(0) || (LevelName!=TEXT("Level_01_ReceivingSorting") && LevelName!=TEXT("Level_01_ContinuousFactory"))) return;
     if (!LocalPowerControllerClass)
         LocalPowerControllerClass=LoadClass<AActor>(nullptr,TEXT("/Game/REBOOT/Level_1/Section_4/Blueprints/BP_LocalPowerController.BP_LocalPowerController_C"));
     if (!LocalPowerControllerClass) return;
