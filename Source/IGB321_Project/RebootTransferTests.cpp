@@ -15,6 +15,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
+#include "PhysicsEngine/BodyInstance.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTransferTimingTest,"REBOOT.TransferShaft.BoardingStopsAndTravel",
     EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -294,6 +295,14 @@ bool FTransferObstructionTest::RunTest(const FString& Parameters)
 {
     FTransferTestWorld Scene;
     if (!Scene.Create(*this)) return false;
+    UClass* RobotClass=LoadClass<ACharacter>(nullptr,TEXT("/Game/StackOBot/Blueprints/Character/BP_Bot.BP_Bot_C"));
+    if (!TestNotNull(TEXT("Actual robot collision defaults are available"),RobotClass)) return false;
+    const ACharacter* Defaults=RobotClass->GetDefaultObject<ACharacter>();
+    UCapsuleComponent* Capsule=Scene.Pawn->GetCapsuleComponent();
+    Capsule->DestroyPhysicsState();
+    Capsule->GetBodyInstance()->CopyBodyInstancePropertiesFrom(Defaults->GetCapsuleComponent()->GetBodyInstance());
+    Capsule->CreatePhysicsState();
+    TestEqual(TEXT("The headroom regression uses the robot's inline Custom collision settings"),Capsule->GetCollisionProfileName(),FName(TEXT("Custom")));
     Scene.Gallery->ActivateSwitchA();
     TestTrue(TEXT("A is powered before the headroom simulation"),Scene.Gallery->bPowered);
     Scene.Place(FVector(3550,2500,62.5));

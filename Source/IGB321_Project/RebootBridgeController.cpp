@@ -186,8 +186,12 @@ void ARebootBridgeController::UpdateRecovery(float DeltaSeconds)
         && Character->GetCharacterMovement()->IsMovingOnGround()) bSectionCompleted=true;
     RecoveryCooldown=FMath::Max(0.0f,RecoveryCooldown-DeltaSeconds);
     if (!bOwnsCheckpoint || Feet>-240 || RecoveryCooldown>0) return;
-    if (UFunction* ClearGrab=Character->FindFunction(TEXT("Grab_Clear"));ClearGrab && ClearGrab->NumParms==0) Character->ProcessEvent(ClearGrab,nullptr);
     TArray<UPhysicsHandleComponent*> Handles;Character->GetComponents(Handles);
+    const bool Holding=Handles.ContainsByPredicate([](const UPhysicsHandleComponent* Handle)
+    {
+        return IsValid(Handle) && IsValid(Handle->GetGrabbedComponent());
+    });
+    if (UFunction* ClearGrab=Character->FindFunction(TEXT("Grab_Clear"));Holding && ClearGrab && ClearGrab->NumParms==0) Character->ProcessEvent(ClearGrab,nullptr);
     for (UPhysicsHandleComponent* Handle:Handles) Handle->ReleaseComponent();
     Character->GetCharacterMovement()->StopMovementImmediately();
     FMovementBaseInterfaceData NoBase;

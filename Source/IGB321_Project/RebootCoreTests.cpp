@@ -4,6 +4,7 @@
 #include "CoreGlobals.h"
 #include "RebootCoreController.h"
 #include "RebootCoreState.h"
+#include "RebootGameInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/LightComponent.h"
@@ -109,6 +110,7 @@ namespace
 struct FCoreTestWorld
 {
     UWorld* World=nullptr;
+    URebootGameInstance* Progress=nullptr;
     UStaticMesh* Cube=nullptr;
     APlayerController* Player=nullptr;
     ACharacter* Pawn=nullptr;
@@ -167,6 +169,8 @@ struct FCoreTestWorld
         World=UWorld::CreateWorld(EWorldType::Game,false,NAME_None,nullptr,true,ERHIFeatureLevel::Num,&Init);
         if (!Test.TestNotNull(TEXT("An isolated core physics world is available"),World)) return false;
         GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+        Progress=NewObject<URebootGameInstance>(World);World->SetGameInstance(Progress);
+        Progress->CompleteSystem(0);Progress->CompleteSystem(1);
         Cube=LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube"));
         UStaticMesh* ShuttleMesh=LoadObject<UStaticMesh>(nullptr,TEXT("/Game/REBOOT/Level_3/Meshes/SM_shuttle_platform_300x200.SM_shuttle_platform_300x200"));
         UStaticMesh* RelayMesh=LoadObject<UStaticMesh>(nullptr,TEXT("/Game/REBOOT/Level_3/Meshes/SM_power_relay.SM_power_relay"));
@@ -521,6 +525,34 @@ bool FCoreFinaleTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Fall and electrical recovery cannot interrupt the locked ending"),Scene.Core->FallResetCount+Scene.Core->HazardResetCount,Resets);
     TestTrue(TEXT("Normal lighting returns to the core"),Scene.EmergencyLight->GetLightComponent()->GetLightColor().G>.5f);
     TestTrue(TEXT("The stable ending camera remains selected"),Scene.Player->GetViewTarget()==Scene.Camera);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCoreEarnedProgressTest,"REBOOT.CentralCore.EarlierSystemsMustActuallyBeEarned",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FCoreEarnedProgressTest::RunTest(const FString& Parameters)
+{
+    FCoreTestWorld Scene;if (!Scene.Create(*this)) return false;
+    Scene.Progress->ResetProgress();Scene.Frames(2);
+    TestEqual(TEXT("Opening the core without progress presumes no earlier systems"),Scene.Core->ActiveSystemCount,0);
+    if (!Scene.ActivateAll(*this)) return false;
+    Scene.Place(FVector(550,2580,62.5));Scene.Frames(2);
+    TestTrue(TEXT("Completing the local relays earns only the core system"),Scene.Progress->IsSystemComplete(2));
+    TestEqual(TEXT("The system count includes only the one earned system"),Scene.Core->ActiveSystemCount,1);
+    TestFalse(TEXT("All local relays cannot bypass missing earlier systems"),Scene.Core->CanReboot());
+    Scene.Key(true);Scene.Frames(75);Scene.Key(false);Scene.Frames(1);
+    TestFalse(TEXT("A full held interaction cannot start an unearned finale"),Scene.Core->bRebootStarted);
+    TestEqual(TEXT("An ineligible finale accumulates no hold progress"),Scene.Core->RebootHoldProgress,0.0f);
+    Scene.Progress->CompleteSystem(0);Scene.Frames(1);
+    TestEqual(TEXT("Completing System 1 updates the real indicator count"),Scene.Core->ActiveSystemCount,2);
+    TestFalse(TEXT("A missing System 2 still blocks the finale"),Scene.Core->CanReboot());
+    Scene.Progress->ResetProgress();Scene.Progress->CompleteSystem(1);Scene.Frames(1);
+    TestFalse(TEXT("A missing System 1 also blocks the finale"),Scene.Core->CanReboot());
+    Scene.Progress->CompleteSystem(0);Scene.Frames(1);
+    TestEqual(TEXT("All three earned systems are finally counted"),Scene.Core->ActiveSystemCount,3);
+    TestTrue(TEXT("Earned earlier systems permit the normal console interaction"),Scene.Core->CanReboot());
+    Scene.Key(true);Scene.Frames(61);Scene.Key(false);
+    TestTrue(TEXT("The usual one-second hold starts the earned finale"),Scene.Core->bRebootStarted);
     return true;
 }
 

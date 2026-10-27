@@ -1,4 +1,5 @@
 #include "RebootCoreController.h"
+#include "RebootGameInstance.h"
 #include "CollisionQueryParams.h"
 #include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
@@ -162,7 +163,12 @@ void ARebootCoreController::Tick(float DeltaSeconds)
     RelayMask=State.RelayMask;CompletedRelayCount=static_cast<int32>(State.RelayActive(0))+State.RelayActive(1)+State.RelayActive(2);
     bGateLatched=State.bGateLatched;GateCountdown=State.GateHoldRemaining;RebootHoldProgress=State.RebootHeldSeconds;
     bRebootStarted=State.bFinaleStarted;bFacilityRebootComplete=State.bComplete;FinaleProgress=static_cast<float>(State.FinaleElapsed/15.0);
-    ActiveSystemCount=State.AllRelaysActive()?3:2;
+    if (URebootGameInstance* Progress=Cast<URebootGameInstance>(GetGameInstance()))
+    {
+        if (State.AllRelaysActive()) Progress->CompleteSystem(2);
+        ActiveSystemCount=Progress->GetCompletedSystemCount();
+    }
+    else ActiveSystemCount=0;
     if (Starting) StartFinale();
     UpdateGate(Step);UpdateRecovery(Step);UpdateFinale(Step);UpdateVisuals();
 }
@@ -189,11 +195,21 @@ void ARebootCoreController::ActivateRelay(int32 Index)
     if (!CanActivateRelay(Index)) return;
     State.ActivateRelay(Index);RelayMask=State.RelayMask;
     CompletedRelayCount=static_cast<int32>(State.RelayActive(0))+State.RelayActive(1)+State.RelayActive(2);
+    if (URebootGameInstance* Progress=Cast<URebootGameInstance>(GetGameInstance()))
+    {
+        if (State.AllRelaysActive()) Progress->CompleteSystem(2);
+        ActiveSystemCount=Progress->GetCompletedSystemCount();
+    }
     UpdateVisuals();
+}
+bool ARebootCoreController::ArePreviousSystemsComplete() const
+{
+    const URebootGameInstance* Progress=Cast<URebootGameInstance>(GetGameInstance());
+    return Progress && Progress->IsSystemComplete(0) && Progress->IsSystemComplete(1);
 }
 bool ARebootCoreController::CanReboot() const
 {
-    if (!State.AllRelaysActive() || State.bFinaleStarted || !IsValid(Character) || !IsValid(FinaleCameraActor)
+    if (!ArePreviousSystemsComplete() || !State.AllRelaysActive() || State.bFinaleStarted || !IsValid(Character) || !IsValid(FinaleCameraActor)
         || !Character->GetCharacterMovement()->IsMovingOnGround() || !ConsolePadVolume->Bounds.GetBox().IsInside(Character->GetActorLocation())) return false;
     const UCapsuleComponent* Capsule=Character->GetCapsuleComponent();
     const double Feet=Capsule->GetComponentLocation().Z-Capsule->GetScaledCapsuleHalfHeight();
@@ -331,13 +347,17 @@ void ARebootCoreController::UpdateVisuals()
         RelayPrompts[Index]->SetTextRenderColor(State.RelayActive(Index)?FColor(65,235,155):FColor(235,235,220));
     }
     CoreText(ConsolePrompt,State.bComplete?TEXT("FACILITY REBOOT COMPLETE"):State.bFinaleStarted?TEXT("REBOOT IN PROGRESS"):
-        State.AllRelaysActive()?FString::Printf(TEXT("HOLD E: REBOOT  %.0f%%"),State.RebootHeldSeconds*100):FString::Printf(TEXT("ACTIVATE RELAYS A / B / C\n%d / 3 ONLINE - ANY ORDER"),CompletedRelayCount));
+        State.AllRelaysActive()?!ArePreviousSystemsComplete()?TEXT("RESTORE SYSTEMS 1 AND 2 FIRST\nSTART FROM LEVEL 1"):FString::Printf(TEXT("HOLD E: REBOOT  %.0f%%"),State.RebootHeldSeconds*100):FString::Printf(TEXT("ACTIVATE RELAYS A / B / C\n%d / 3 ONLINE - ANY ORDER"),CompletedRelayCount));
     ConsolePrompt->SetVisibility(!State.bFinaleStarted);
     CoreText(GatePrompt,State.bGateLatched?TEXT("C ACCESS LATCHED OPEN"):GateCountdown>0?FString::Printf(TEXT("C GATE: %.1fs"),GateCountdown):TEXT("C PLATE OPENS GATE\n6s AFTER LEAVING"));
     CoreText(ElectricalPrompt,State.RelayActive(1)?TEXT("B STRIP ISOLATED"):bElectricalWarning?TEXT("B WARNING - WAIT"):bElectricalLive?TEXT("B LIVE - STAY ON PAD"):TEXT("B DARK - CROSS NOW"));
     CompletionText->SetVisibility(State.bFinaleStarted);SystemText->SetVisibility(State.bFinaleStarted);
     CoreText(CompletionText,State.bComplete?TEXT("FACILITY REBOOT COMPLETE"):TEXT("RESTORING FACILITY..."));
-    CoreText(SystemText,TEXT("SYSTEM 1 ONLINE | SYSTEM 2 ONLINE | SYSTEM 3 ONLINE"));
+    const URebootGameInstance* Progress=Cast<URebootGameInstance>(GetGameInstance());
+    CoreText(SystemText,FString::Printf(TEXT("SYSTEM 1 %s | SYSTEM 2 %s | SYSTEM 3 %s"),
+        Progress && Progress->IsSystemComplete(0)?TEXT("ONLINE"):TEXT("OFFLINE"),
+        Progress && Progress->IsSystemComplete(1)?TEXT("ONLINE"):TEXT("OFFLINE"),
+        Progress && Progress->IsSystemComplete(2)?TEXT("ONLINE"):TEXT("OFFLINE")));
     CompletionText->SetTextRenderColor(State.bComplete?FColor(65,235,155):FColor(235,240,255));
     SystemText->SetTextRenderColor(FColor(65,235,155));
     if (IsValid(FinaleCameraActor))

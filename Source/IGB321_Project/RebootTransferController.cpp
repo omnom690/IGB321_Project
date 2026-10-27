@@ -146,8 +146,10 @@ bool ARebootTransferController::IsLiftMoveBlocked(const FVector& Delta,const ACh
         Query.AddIgnoredActor(LiftCollisionActor);
         FHitResult Hit;
         const FVector Start=Capsule->GetComponentLocation();
-        return GetWorld()->SweepSingleByProfile(Hit,Start,Start+Delta,Capsule->GetComponentQuat(),
-            Capsule->GetCollisionProfileName(),FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query);
+        // Custom collision responses on the robot need not have a registered profile name.
+        return GetWorld()->SweepSingleByChannel(Hit,Start,Start+Delta,Capsule->GetComponentQuat(),Capsule->GetCollisionObjectType(),
+            FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query,
+            FCollisionResponseParams(Capsule->GetCollisionResponseToChannels()));
     }
     if (Delta.Z<0)
     {

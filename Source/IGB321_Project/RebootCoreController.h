@@ -79,11 +79,12 @@ public:
     UPROPERTY(VisibleInstanceOnly,BlueprintReadOnly,Transient,Category="Recycling Core|State") bool bRobotLocked=false;
     UPROPERTY(VisibleInstanceOnly,BlueprintReadOnly,Transient,Category="Recycling Core|State") bool bFacilityRebootComplete=false;
     UPROPERTY(VisibleInstanceOnly,BlueprintReadOnly,Transient,Category="Recycling Core|State") float FinaleProgress=0;
-    UPROPERTY(VisibleInstanceOnly,BlueprintReadOnly,Transient,Category="Recycling Core|State") int32 ActiveSystemCount=2;
+    UPROPERTY(VisibleInstanceOnly,BlueprintReadOnly,Transient,Category="Recycling Core|State") int32 ActiveSystemCount=0;
 
     UFUNCTION(BlueprintPure,Category="Recycling Core") bool CanActivateRelay(int32 Index) const;
     UFUNCTION(BlueprintCallable,Category="Recycling Core") void ActivateRelay(int32 Index);
     UFUNCTION(BlueprintPure,Category="Recycling Core") bool CanReboot() const;
+    UFUNCTION(BlueprintPure,Category="Recycling Core") bool ArePreviousSystemsComplete() const;
     // Input-action binding for Blueprint/controller interactions; the keyboard
     // path and this binding share the same pad checks and timed hold.
     UFUNCTION(BlueprintCallable,Category="Recycling Core|Input") void SetRebootInteractionHeld(bool Held);
